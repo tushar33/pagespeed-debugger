@@ -21,7 +21,11 @@ const CORE_METRICS = [
 ];
 
 // Audits worth calling out explicitly when present, beyond the generic
-// opportunities/diagnostics sweep below.
+// opportunities/diagnostics sweep below. Lighthouse has renamed most of
+// these over time (pre-12: 'prioritize-lcp-image'/'render-blocking-resources'
+// /'third-party-summary'; 12+: '*-insight' ids under a new 'insights' group)
+// — list both eras so this works regardless of which Lighthouse version
+// produced the report.
 const SPOTLIGHT_AUDITS = [
   'largest-contentful-paint-element',
   'lcp-lazy-loaded',
@@ -31,7 +35,18 @@ const SPOTLIGHT_AUDITS = [
   'third-party-summary',
   'font-display',
   'critical-request-chains',
+  // Lighthouse 12+ "Insight audit" ids
+  'lcp-breakdown-insight',
+  'lcp-discovery-insight',
+  'render-blocking-insight',
+  'third-parties-insight',
+  'image-delivery-insight',
+  'document-latency-insight',
 ];
+
+// Groups whose audits should feed the ranked sweep below. 'load-opportunities'
+// is the pre-Lighthouse-12 name; 'insights' replaced most of it in 12+.
+const OPPORTUNITY_GROUPS = new Set(['load-opportunities', 'diagnostics', 'insights']);
 
 function loadReport(filePath) {
   const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -42,12 +57,38 @@ function loadReport(filePath) {
   throw new Error('Unrecognized report shape — expected {lighthouseResult}, {meta,lighthouseResult}, or a raw Lighthouse report with .audits');
 }
 
-function fmtItem(item) {
+// Lighthouse 12+ "Insight audit" details nest sub-tables/DOM-node refs/
+// checklists inside `details.items` instead of a flat list of resource
+// rows — handle those shapes explicitly so they print as readable lines
+// instead of a raw JSON dump.
+function fmtItem(item, indent = '    ') {
+  if (item.type === 'table' && Array.isArray(item.items)) {
+    return item.items.map((row) => `${indent}${fmtItem(row, indent)}`).join('\n');
+  }
+  if (item.type === 'node') {
+    return item.snippet || item.nodeLabel || item.selector || '(DOM node)';
+  }
+  if (item.type === 'checklist' && item.items && typeof item.items === 'object') {
+    return Object.values(item.items)
+      .map((c) => `${c.value ? '✓' : '✗'} ${c.label}`)
+      .join(', ');
+  }
+  // third-parties-insight / third-party-summary shape: {entity, transferSize, mainThreadTime}
+  if (item.entity && (item.transferSize !== undefined || item.mainThreadTime !== undefined)) {
+    const parts = [item.entity];
+    if (item.transferSize !== undefined) parts.push(`${Math.round(item.transferSize / 1024)} KiB`);
+    if (item.mainThreadTime !== undefined) parts.push(`${Math.round(item.mainThreadTime)} ms main-thread`);
+    return parts.join(' — ');
+  }
+
   const parts = [];
+  if (item.label || item.subpart || item.groupLabel) parts.push(item.label || item.subpart || item.groupLabel);
   if (item.url) parts.push(item.url.length > 90 ? item.url.slice(0, 87) + '...' : item.url);
   if (item.wastedBytes) parts.push(`${Math.round(item.wastedBytes / 1024)} KiB wasted`);
   if (item.wastedMs) parts.push(`${Math.round(item.wastedMs)} ms wasted`);
+  if (item.totalBytes !== undefined && item.wastedBytes === undefined) parts.push(`${Math.round(item.totalBytes / 1024)} KiB`);
   if (item.total !== undefined) parts.push(`${Math.round(item.total)} ms total`);
+  if (item.duration !== undefined) parts.push(`${Math.round(item.duration)} ms`);
   return parts.join(' — ') || JSON.stringify(item).slice(0, 120);
 }
 
@@ -95,7 +136,7 @@ function main() {
   console.log('\n-- Ranked opportunities & diagnostics (worst first) --');
   if (perfCategory && Array.isArray(perfCategory.auditRefs)) {
     const findings = perfCategory.auditRefs
-      .filter((r) => r.group === 'load-opportunities' || r.group === 'diagnostics')
+      .filter((r) => OPPORTUNITY_GROUPS.has(r.group))
       .map((r) => ({ ref: r, audit: audits[r.id] }))
       .filter((x) => x.audit && x.audit.score !== null && x.audit.score < 1)
       .sort((a, b) => a.audit.score - b.audit.score);
