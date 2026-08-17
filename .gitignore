@@ -1,0 +1,8 @@
+# PSI API key — never commit
+.psi-api-key
+
+# Investigation output — may contain data about non-public pages
+reports/
+
+# OS/editor cruft
+.DS_Store
