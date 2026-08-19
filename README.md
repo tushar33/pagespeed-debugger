@@ -19,7 +19,18 @@ API to get real numbers instead of guessing from the code. This skill turns
 that into three reusable scripts so the same investigation runs the same
 way every time, on any URL, in any project.
 
-## Install
+## Quick install (one line)
+
+From your project's repo root:
+
+```bash
+curl -sL https://raw.githubusercontent.com/tushar33/pagespeed-debugger/main/install.sh | bash
+```
+
+This clones the skill into `.claude/skills/pagespeed-debugger` (and drops
+the nested `.git`, so it doesn't create a submodule in your project).
+
+## Manual install
 
 Drop this into any project as a Claude Code skill:
 
