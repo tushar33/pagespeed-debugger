@@ -130,6 +130,10 @@ function main() {
     console.log(`  [${id}] score=${a.score} ${a.displayValue || ''}`);
     if (a.details && Array.isArray(a.details.items)) {
       a.details.items.slice(0, 3).forEach((item) => console.log(`    - ${fmtItem(item)}`));
+    } else if (a.details && a.details.items && typeof a.details.items === 'object') {
+      // Checklist-type details: `items` is itself a map of pass/fail entries,
+      // not an array — route it through fmtItem's checklist formatting.
+      console.log(`    - ${fmtItem({ type: 'checklist', items: a.details.items })}`);
     }
   }
 
@@ -148,6 +152,8 @@ function main() {
       console.log(`\n  [score ${audit.score}] ${ref.id} — ${audit.displayValue || audit.title || ''}`);
       if (audit.details && Array.isArray(audit.details.items)) {
         audit.details.items.slice(0, 5).forEach((item) => console.log(`    - ${fmtItem(item)}`));
+      } else if (audit.details && audit.details.items && typeof audit.details.items === 'object') {
+        console.log(`    - ${fmtItem({ type: 'checklist', items: audit.details.items })}`);
       }
     }
   }
