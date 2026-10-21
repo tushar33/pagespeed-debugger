@@ -11,8 +11,8 @@ const path = require('path');
 
 // Pinned so repeated/compared runs use the same Lighthouse release (an
 // unversioned `npx lighthouse` can resolve to different releases across
-// hosts or collection dates) and so it stays compatible with this skill's
-// documented Node 18+ requirement.
+// hosts or collection dates). Requires Node 18.20+ (not just any Node 18) —
+// keep this in sync with the Node requirement documented in README.md.
 const LIGHTHOUSE_VERSION = 'lighthouse@12.6.0';
 
 function isAvailable(timeoutMs = 60000) {

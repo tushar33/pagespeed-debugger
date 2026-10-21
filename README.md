@@ -135,8 +135,9 @@ Reports are saved by default under `reports/pagespeed-debugger/raw/`
 whatever repo you drop this skill into, it may contain data about
 unreleased/internal pages).
 
-Requires Node 18+ (uses global `fetch`). No npm dependencies — plain Node
-built-ins only.
+Requires Node 18.20+ (the pinned local-Lighthouse version's own minimum;
+the PSI/anonymous paths need only global `fetch`, available since Node
+18.0). No npm dependencies — plain Node built-ins only.
 
 ## License
 

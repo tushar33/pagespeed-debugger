@@ -15,11 +15,11 @@ docs if these have drifted since a Lighthouse version bump.
 | Metric | Value | Mobile threshold | Desktop threshold |
 |---|---|---|---|
 | Performance score | {{score}}/100 | ≥90 good, 50-89 needs improvement, <50 poor | (same) |
-| LCP | {{value}} | ≤2.5s good, ≤4s needs improvement | ≤1.2s good |
-| FCP | {{value}} | ≤1.8s good | ≤0.9s good |
-| TBT | {{value}} | ≤200ms good | ≤150ms good |
+| LCP | {{value}} | ≤2.5s good, ≤4s needs improvement | ≤1.2s good, ≤2.4s needs improvement |
+| FCP | {{value}} | ≤1.8s good | ≤0.9s good, ≤1.6s needs improvement |
+| TBT | {{value}} | ≤200ms good | ≤150ms good, ≤350ms needs improvement |
 | CLS | {{value}} | ≤0.1 good | (same) |
-| Speed Index | {{value}} | ≤3.4s good | ≤1.3s good |
+| Speed Index | {{value}} | ≤3.4s good | ≤1.3s good, ≤2.3s needs improvement |
 
 ## FCP → LCP gap
 
