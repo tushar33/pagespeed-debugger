@@ -57,11 +57,14 @@ function main() {
     const better = !withinNoise && (lowerIsBetter ? delta < 0 : delta > 0);
     const worse = !withinNoise && (lowerIsBetter ? delta > 0 : delta < 0);
     const flag = better ? ' ✓ improved' : worse ? ' ✗ regressed' : withinNoise ? ' (within run-to-run noise)' : '';
+    // CLS is a small unitless decimal (noise floor 0.01) — integer rounding
+    // would hide every real change. Round ms metrics to whole numbers.
+    const deltaDisplay = unit === '' ? delta.toFixed(3) : Math.round(delta);
     console.log(
       label.padEnd(8) +
       String(auditA.displayValue || valA).padEnd(14) +
       String(auditB.displayValue || valB).padEnd(14) +
-      `${delta >= 0 ? '+' : ''}${Math.round(delta)}${unit}${flag}`
+      `${delta >= 0 ? '+' : ''}${deltaDisplay}${unit}${flag}`
     );
   }
 }

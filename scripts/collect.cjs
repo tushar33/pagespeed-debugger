@@ -40,12 +40,15 @@ function parseArgs(argv) {
 
 function defaultOutPath(url, strategy) {
   const slug = url.replace(/^https?:\/\//, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
+  // A run identifier, not just url+strategy, so a same-URL before/after
+  // comparison doesn't silently overwrite the earlier report.
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const dir = path.join(process.cwd(), 'reports', 'pagespeed-debugger', 'raw');
   fs.mkdirSync(dir, { recursive: true });
-  return path.join(dir, `${slug}-${strategy}.json`);
+  return path.join(dir, `${slug}-${strategy}-${timestamp}.json`);
 }
 
-function normalize({ source, url, strategy, lighthouseResult, note }) {
+function normalize({ source, url, strategy, lighthouseResult, loadingExperience, originLoadingExperience, note }) {
   return {
     meta: {
       source,
@@ -55,7 +58,19 @@ function normalize({ source, url, strategy, lighthouseResult, note }) {
       note: note || null,
     },
     lighthouseResult,
+    ...(loadingExperience ? { loadingExperience } : {}),
+    ...(originLoadingExperience ? { originLoadingExperience } : {}),
   };
+}
+
+// PSI/Lighthouse can return a "successful" response whose lighthouseResult
+// carries a runtimeError (e.g. ERRORED_DOCUMENT_REQUEST) instead of real
+// performance measurements. Treat that as a failed attempt so the collector
+// moves on to its next tier rather than saving an unusable report.
+function runtimeErrorOf(lighthouseResult) {
+  return lighthouseResult && lighthouseResult.runtimeError && lighthouseResult.runtimeError.code
+    ? lighthouseResult.runtimeError
+    : null;
 }
 
 async function main() {
@@ -76,11 +91,18 @@ async function main() {
     if (creds.key) {
       try {
         const body = await runPsi({ url, strategy: args.strategy, key: creds.key });
-        return emit(normalize({
-          source: `psi-api (key: ${creds.source})`,
-          url, strategy: args.strategy,
-          lighthouseResult: body.lighthouseResult,
-        }), args, url);
+        const runtimeError = runtimeErrorOf(body.lighthouseResult);
+        if (runtimeError) {
+          attempts.push(`psi-api-with-key: runtimeError ${runtimeError.code} (${runtimeError.message})`);
+        } else {
+          return emit(normalize({
+            source: `psi-api (key: ${creds.source})`,
+            url, strategy: args.strategy,
+            lighthouseResult: body.lighthouseResult,
+            loadingExperience: body.loadingExperience,
+            originLoadingExperience: body.originLoadingExperience,
+          }), args, url);
+        }
       } catch (err) {
         attempts.push(`psi-api-with-key: ${err.message}${err.reason ? ` (${err.reason})` : ''}`);
       }
@@ -95,11 +117,16 @@ async function main() {
     if (available) {
       try {
         const report = await lighthouseLocal.runLighthouse({ url, strategy: args.strategy });
-        return emit(normalize({
-          source: 'local-lighthouse',
-          url, strategy: args.strategy,
-          lighthouseResult: report,
-        }), args, url);
+        const runtimeError = runtimeErrorOf(report);
+        if (runtimeError) {
+          attempts.push(`local-lighthouse: runtimeError ${runtimeError.code} (${runtimeError.message})`);
+        } else {
+          return emit(normalize({
+            source: 'local-lighthouse',
+            url, strategy: args.strategy,
+            lighthouseResult: report,
+          }), args, url);
+        }
       } catch (err) {
         attempts.push(`local-lighthouse: ${err.message}`);
       }
@@ -112,12 +139,19 @@ async function main() {
   if (wantPsi) {
     try {
       const body = await runPsi({ url, strategy: args.strategy, key: null });
-      return emit(normalize({
-        source: 'psi-api (anonymous, no key)',
-        url, strategy: args.strategy,
-        lighthouseResult: body.lighthouseResult,
-        note: 'Used the small shared anonymous PSI quota — get your own key (see README) for reliable repeated use.',
-      }), args, url);
+      const runtimeError = runtimeErrorOf(body.lighthouseResult);
+      if (runtimeError) {
+        attempts.push(`psi-api-anonymous: runtimeError ${runtimeError.code} (${runtimeError.message})`);
+      } else {
+        return emit(normalize({
+          source: 'psi-api (anonymous, no key)',
+          url, strategy: args.strategy,
+          lighthouseResult: body.lighthouseResult,
+          loadingExperience: body.loadingExperience,
+          originLoadingExperience: body.originLoadingExperience,
+          note: 'Used the small shared anonymous PSI quota — get your own key (see README) for reliable repeated use.',
+        }), args, url);
+      }
     } catch (err) {
       attempts.push(`psi-api-anonymous: ${err.message}${err.reason ? ` (${err.reason})` : ''}`);
     }

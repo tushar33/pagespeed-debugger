@@ -9,11 +9,22 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-function isAvailable(timeoutMs = 8000) {
+// Pinned so repeated/compared runs use the same Lighthouse release (an
+// unversioned `npx lighthouse` can resolve to different releases across
+// hosts or collection dates). Requires Node 18.20+ (not just any Node 18) —
+// keep this in sync with the Node requirement documented in README.md.
+const LIGHTHOUSE_VERSION = 'lighthouse@12.6.0';
+
+function isAvailable(timeoutMs = 60000) {
+  // 60s, not a few seconds: on a first run npx must download the pinned
+  // Lighthouse release before `--version` can even answer, and a timeout
+  // here would be mistaken for "Lighthouse isn't available" even though it
+  // would have worked given a little longer. Subsequent runs resolve from
+  // npx's local cache and return almost immediately.
   return new Promise((resolve) => {
     const child = execFile(
       'npx',
-      ['--yes', 'lighthouse', '--version'],
+      ['--yes', LIGHTHOUSE_VERSION, '--version'],
       { timeout: timeoutMs },
       (err) => resolve(!err)
     );
@@ -30,7 +41,7 @@ function runLighthouse({ url, strategy = 'mobile', timeoutMs = 120000 }) {
     const outPath = path.join(os.tmpdir(), `lh-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
     const args = [
       '--yes',
-      'lighthouse',
+      LIGHTHOUSE_VERSION,
       url,
       '--output=json',
       `--output-path=${outPath}`,
