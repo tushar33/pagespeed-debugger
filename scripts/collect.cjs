@@ -73,6 +73,26 @@ function runtimeErrorOf(lighthouseResult) {
     : null;
 }
 
+// A 2xx PSI response can still have an empty/malformed body (no
+// lighthouseResult at all, or one missing the fields diagnose.cjs actually
+// needs). Reject those here so the collector tries its next tier instead of
+// saving a report diagnose.cjs will just reject later as unrecognized.
+function isUsableLighthouseResult(lighthouseResult) {
+  const performance = lighthouseResult &&
+    lighthouseResult.categories &&
+    lighthouseResult.categories.performance;
+  return !!(
+    lighthouseResult &&
+    typeof lighthouseResult === 'object' &&
+    lighthouseResult.audits &&
+    typeof lighthouseResult.audits === 'object' &&
+    Object.keys(lighthouseResult.audits).length > 0 &&
+    performance &&
+    typeof performance === 'object' &&
+    Number.isFinite(performance.score)
+  );
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const url = args._[0];
@@ -94,6 +114,8 @@ async function main() {
         const runtimeError = runtimeErrorOf(body.lighthouseResult);
         if (runtimeError) {
           attempts.push(`psi-api-with-key: runtimeError ${runtimeError.code} (${runtimeError.message})`);
+        } else if (!isUsableLighthouseResult(body.lighthouseResult)) {
+          attempts.push('psi-api-with-key: invalid response (missing usable lighthouseResult)');
         } else {
           return emit(normalize({
             source: `psi-api (key: ${creds.source})`,
@@ -120,6 +142,8 @@ async function main() {
         const runtimeError = runtimeErrorOf(report);
         if (runtimeError) {
           attempts.push(`local-lighthouse: runtimeError ${runtimeError.code} (${runtimeError.message})`);
+        } else if (!isUsableLighthouseResult(report)) {
+          attempts.push('local-lighthouse: invalid response (missing usable lighthouseResult)');
         } else {
           return emit(normalize({
             source: 'local-lighthouse',
@@ -142,6 +166,8 @@ async function main() {
       const runtimeError = runtimeErrorOf(body.lighthouseResult);
       if (runtimeError) {
         attempts.push(`psi-api-anonymous: runtimeError ${runtimeError.code} (${runtimeError.message})`);
+      } else if (!isUsableLighthouseResult(body.lighthouseResult)) {
+        attempts.push('psi-api-anonymous: invalid response (missing usable lighthouseResult)');
       } else {
         return emit(normalize({
           source: 'psi-api (anonymous, no key)',
