@@ -78,12 +78,18 @@ function runtimeErrorOf(lighthouseResult) {
 // needs). Reject those here so the collector tries its next tier instead of
 // saving a report diagnose.cjs will just reject later as unrecognized.
 function isUsableLighthouseResult(lighthouseResult) {
+  const performance = lighthouseResult &&
+    lighthouseResult.categories &&
+    lighthouseResult.categories.performance;
   return !!(
     lighthouseResult &&
     typeof lighthouseResult === 'object' &&
     lighthouseResult.audits &&
-    lighthouseResult.categories &&
-    lighthouseResult.categories.performance
+    typeof lighthouseResult.audits === 'object' &&
+    Object.keys(lighthouseResult.audits).length > 0 &&
+    performance &&
+    typeof performance === 'object' &&
+    Number.isFinite(performance.score)
   );
 }
 
@@ -136,6 +142,8 @@ async function main() {
         const runtimeError = runtimeErrorOf(report);
         if (runtimeError) {
           attempts.push(`local-lighthouse: runtimeError ${runtimeError.code} (${runtimeError.message})`);
+        } else if (!isUsableLighthouseResult(report)) {
+          attempts.push('local-lighthouse: invalid response (missing usable lighthouseResult)');
         } else {
           return emit(normalize({
             source: 'local-lighthouse',
